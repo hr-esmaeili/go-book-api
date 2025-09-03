@@ -99,7 +99,7 @@ jobs:
         password: ${{ secrets.SERVER_PASSWORD }}
         port: ${{ secrets.SERVER_PORT }}
         source: "deploy/go-book-api.service"
-        target: "/tmp/go-book-api.service"
+        target: "/tmp/"
         debug: true
         
     - name: Copy environment file
@@ -128,19 +128,28 @@ jobs:
           # Make binary executable
           chmod +x /opt/go-book-api/go-book-api
           
-          # Verify service file exists before copying
+          # Find and copy the service file
+          SERVICE_FILE=""
           if [ -f /tmp/go-book-api.service ]; then
-            echo "Service file found, copying to systemd directory"
-            echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S cp /tmp/go-book-api.service /etc/systemd/system/
-            echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S systemctl daemon-reload
-            echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S systemctl enable go-book-api
-            echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S systemctl start go-book-api
+            SERVICE_FILE="/tmp/go-book-api.service"
+          elif [ -f /tmp/deploy/go-book-api.service ]; then
+            SERVICE_FILE="/tmp/deploy/go-book-api.service"
           else
-            echo "ERROR: Service file not found at /tmp/go-book-api.service"
-            echo "Available files in /tmp:"
-            ls -la /tmp/
+            echo "ERROR: Service file not found in expected locations"
+            echo "Searching for service files:"
+            find /tmp -name "*.service" -type f 2>/dev/null || echo "No .service files found"
             exit 1
           fi
+          
+          echo "Found service file at: $SERVICE_FILE"
+          echo "Service file contents:"
+          cat "$SERVICE_FILE"
+          
+          # Copy service file to systemd directory
+          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S cp "$SERVICE_FILE" /etc/systemd/system/go-book-api.service
+          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S systemctl daemon-reload
+          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S systemctl enable go-book-api
+          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S systemctl start go-book-api
           
           # Wait a moment for service to start
           sleep 5
