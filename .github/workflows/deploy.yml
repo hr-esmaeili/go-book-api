@@ -93,6 +93,7 @@ jobs:
         port: ${{ secrets.SERVER_PORT }}
         source: "go-book-api"
         target: "/opt/go-book-api/"
+        overwrite: true
         
     - name: Copy systemd service file
       uses: appleboy/scp-action@v0.1.7
@@ -103,6 +104,7 @@ jobs:
         port: ${{ secrets.SERVER_PORT }}
         source: "deploy/go-book-api.service"
         target: "/tmp/"
+        overwrite: true
         debug: true
         
     - name: Copy environment file
@@ -114,6 +116,7 @@ jobs:
         port: ${{ secrets.SERVER_PORT }}
         source: "deploy/env.production"
         target: "/opt/go-book-api/.env"
+        overwrite: true
         debug: true
         
     - name: Setup and start service
