@@ -65,9 +65,12 @@ jobs:
         password: ${{ secrets.SERVER_PASSWORD }}
         port: ${{ secrets.SERVER_PORT }}
         script: |
+          # Create application user if it doesn't exist
+          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S useradd -r -s /bin/false go-book-api || echo "User go-book-api already exists"
+          
           # Create application directory if it doesn't exist
           echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S mkdir -p /opt/go-book-api
-          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S chown $USER:$USER /opt/go-book-api
+          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S chown go-book-api:go-book-api /opt/go-book-api
           
           # Stop the service if it's running
           echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S systemctl stop go-book-api || true
@@ -79,7 +82,7 @@ jobs:
           
           # Create logs directory
           echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S mkdir -p /var/log/go-book-api
-          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S chown $USER:$USER /var/log/go-book-api
+          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S chown go-book-api:go-book-api /var/log/go-book-api
           
     - name: Copy binary to server
       uses: appleboy/scp-action@v0.1.7
@@ -125,8 +128,9 @@ jobs:
           echo "Files in /tmp:"
           ls -la /tmp/
           
-          # Make binary executable
-          chmod +x /opt/go-book-api/go-book-api
+          # Make binary executable and set correct ownership
+          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S chmod +x /opt/go-book-api/go-book-api
+          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S chown go-book-api:go-book-api /opt/go-book-api/go-book-api
           
           # Find and copy the service file
           SERVICE_FILE=""

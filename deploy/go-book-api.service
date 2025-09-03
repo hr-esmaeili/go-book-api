@@ -5,8 +5,8 @@ Wants=network.target
 
 [Service]
 Type=simple
-User=ubuntu
-Group=ubuntu
+User=go-book-api
+Group=go-book-api
 WorkingDirectory=/opt/go-book-api
 ExecStart=/opt/go-book-api/go-book-api
 Restart=always
