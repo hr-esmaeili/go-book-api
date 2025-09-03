@@ -1,0 +1,140 @@
+name: Deploy to Ubuntu Server
+
+on:
+  push:
+    branches: [ staging ]
+  pull_request:
+    branches: [ staging ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+          
+    - name: Install dependencies
+      run: go mod download
+      
+    - name: Run tests
+      run: go test -v ./...
+      
+    - name: Build application
+      run: go build -o go-book-api .
+      
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: go-book-api-binary
+        path: go-book-api
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/staging' && github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: go-book-api-binary
+        path: ./
+        
+    - name: Deploy to server
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        password: ${{ secrets.SERVER_PASSWORD }}
+        port: ${{ secrets.SERVER_PORT }}
+        script: |
+          # Create application directory if it doesn't exist
+          sudo mkdir -p /opt/go-book-api
+          sudo chown $USER:$USER /opt/go-book-api
+          
+          # Stop the service if it's running
+          sudo systemctl stop go-book-api || true
+          
+          # Backup current binary
+          if [ -f /opt/go-book-api/go-book-api ]; then
+            sudo cp /opt/go-book-api/go-book-api /opt/go-book-api/go-book-api.backup.$(date +%Y%m%d_%H%M%S)
+          fi
+          
+          # Create logs directory
+          sudo mkdir -p /var/log/go-book-api
+          sudo chown $USER:$USER /var/log/go-book-api
+          
+    - name: Copy binary to server
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        password: ${{ secrets.SERVER_PASSWORD }}
+        port: ${{ secrets.SERVER_PORT }}
+        source: "go-book-api"
+        target: "/opt/go-book-api/"
+        
+    - name: Copy systemd service file
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        password: ${{ secrets.SERVER_PASSWORD }}
+        port: ${{ secrets.SERVER_PORT }}
+        source: "deploy/go-book-api.service"
+        target: "/tmp/"
+        
+    - name: Copy environment file
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        password: ${{ secrets.SERVER_PASSWORD }}
+        port: ${{ secrets.SERVER_PORT }}
+        source: "deploy/env.production"
+        target: "/opt/go-book-api/.env"
+        
+    - name: Setup and start service
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        password: ${{ secrets.SERVER_PASSWORD }}
+        port: ${{ secrets.SERVER_PORT }}
+        script: |
+          # Make binary executable
+          chmod +x /opt/go-book-api/go-book-api
+          
+          # Copy and enable systemd service
+          sudo cp /tmp/go-book-api.service /etc/systemd/system/
+          sudo systemctl daemon-reload
+          sudo systemctl enable go-book-api
+          sudo systemctl start go-book-api
+          
+          # Wait a moment for service to start
+          sleep 5
+          
+          # Check service status
+          sudo systemctl status go-book-api --no-pager
+          
+          # Test health endpoint
+          curl -f http://localhost:8080/health || exit 1
+          
+          echo "Deployment completed successfully!"

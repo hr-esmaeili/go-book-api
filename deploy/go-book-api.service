@@ -1,0 +1,34 @@
+[Unit]
+Description=Go Book API Service
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/go-book-api
+ExecStart=/opt/go-book-api/go-book-api
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=go-book-api
+
+# Environment variables
+Environment=PORT=8080
+Environment=HOST=0.0.0.0
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/go-book-api /var/log/go-book-api
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target
