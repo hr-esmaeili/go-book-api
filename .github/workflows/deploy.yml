@@ -64,23 +64,22 @@ jobs:
         username: ${{ secrets.SERVER_USER }}
         password: ${{ secrets.SERVER_PASSWORD }}
         port: ${{ secrets.SERVER_PORT }}
-        sudo: true
         script: |
           # Create application directory if it doesn't exist
-          mkdir -p /opt/go-book-api
-          chown $USER:$USER /opt/go-book-api
+          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S mkdir -p /opt/go-book-api
+          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S chown $USER:$USER /opt/go-book-api
           
           # Stop the service if it's running
-          systemctl stop go-book-api || true
+          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S systemctl stop go-book-api || true
           
           # Backup current binary
           if [ -f /opt/go-book-api/go-book-api ]; then
-            cp /opt/go-book-api/go-book-api /opt/go-book-api/go-book-api.backup.$(date +%Y%m%d_%H%M%S)
+            echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S cp /opt/go-book-api/go-book-api /opt/go-book-api/go-book-api.backup.$(date +%Y%m%d_%H%M%S)
           fi
           
           # Create logs directory
-          mkdir -p /var/log/go-book-api
-          chown $USER:$USER /var/log/go-book-api
+          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S mkdir -p /var/log/go-book-api
+          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S chown $USER:$USER /var/log/go-book-api
           
     - name: Copy binary to server
       uses: appleboy/scp-action@v0.1.7
@@ -119,22 +118,21 @@ jobs:
         username: ${{ secrets.SERVER_USER }}
         password: ${{ secrets.SERVER_PASSWORD }}
         port: ${{ secrets.SERVER_PORT }}
-        sudo: true
         script: |
           # Make binary executable
           chmod +x /opt/go-book-api/go-book-api
           
           # Copy and enable systemd service
-          cp /tmp/go-book-api.service /etc/systemd/system/
-          systemctl daemon-reload
-          systemctl enable go-book-api
-          systemctl start go-book-api
+          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S cp /tmp/go-book-api.service /etc/systemd/system/
+          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S systemctl daemon-reload
+          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S systemctl enable go-book-api
+          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S systemctl start go-book-api
           
           # Wait a moment for service to start
           sleep 5
           
           # Check service status
-          systemctl status go-book-api --no-pager
+          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S systemctl status go-book-api --no-pager
           
           # Test health endpoint
           curl -f http://localhost:8080/health || exit 1
