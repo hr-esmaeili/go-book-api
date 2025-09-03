@@ -1,0 +1,9 @@
+# Supernode Web Server - Development Configuration
+
+[api]
+ip = "0.0.0.0"
+port = 8080
+timeout = "30s"
+
+[database]
+dsn = "root:1234@tcp(localhost:3306)/bookdb?charset=utf8mb4&parseTime=True&loc=Local"

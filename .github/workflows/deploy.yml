@@ -1,0 +1,87 @@
+name: Deploy to Ubuntu Server
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    
+    - name: Download dependencies
+      run: go mod download
+    
+    - name: Verify dependencies
+      run: go mod verify
+    
+    - name: Run tests
+      run: go test ./...
+    
+    - name: Build application
+      run: go build -o bin/go-book-api ./cmd
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Build application
+      run: go build -o bin/go-book-api ./cmd
+    
+    - name: Create deployment package
+      run: |
+        mkdir -p deploy
+        cp bin/go-book-api deploy/
+        cp -r app deploy/
+        cp go.mod deploy/
+        cp go.sum deploy/
+        cp Makefile deploy/
+        cp README.md deploy/
+        tar -czf go-book-api.tar.gz -C deploy .
+    
+    - name: Upload deployment files
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        password: ${{ secrets.PASSWORD }}
+        port: ${{ secrets.PORT }}
+        source: "go-book-api.tar.gz,deploy.sh"
+        target: "/tmp/"
+    
+    - name: Deploy to server
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        password: ${{ secrets.PASSWORD }}
+        port: ${{ secrets.PORT }}
+        script: |
+          # Make deploy script executable and run it
+          chmod +x /tmp/deploy.sh
+          sudo /tmp/deploy.sh

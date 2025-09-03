@@ -1,0 +1,41 @@
+### Health Check
+# Test with default port (8080)
+GET http://localhost:8080/health
+
+# Test with custom port (if you set PORT=3000)
+# GET http://localhost:3000/health
+
+### Get all books
+GET http://localhost:8080/api/books
+
+### Get book by ID
+GET http://localhost:8080/api/books/1
+
+### Create a new book
+POST http://localhost:8080/api/books
+Content-Type: application/json
+
+{
+  "title": "The Pragmatic Programmer",
+  "author": "Andrew Hunt",
+  "year": 1999,
+  "isbn": "978-0201616224"
+}
+
+### Update a book
+PUT http://localhost:8080/api/books/1
+Content-Type: application/json
+
+{
+  "title": "The Go Programming Language (Updated)",
+  "author": "Alan A. A. Donovan",
+  "year": 2015,
+  "isbn": "978-0134190440"
+}
+
+### Delete a book
+DELETE http://localhost:8080/api/books/1
+
+### Test with different port (uncomment and modify as needed)
+# GET http://localhost:3000/api/books
+# GET http://localhost:5000/api/books 
