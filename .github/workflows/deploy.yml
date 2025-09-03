@@ -100,6 +100,8 @@ jobs:
         port: ${{ secrets.SERVER_PORT }}
         source: "deploy/go-book-api.service"
         target: "/tmp/"
+        strip_components: 0
+        debug: true
         
     - name: Copy environment file
       uses: appleboy/scp-action@v0.1.7
@@ -110,6 +112,7 @@ jobs:
         port: ${{ secrets.SERVER_PORT }}
         source: "deploy/env.production"
         target: "/opt/go-book-api/.env"
+        debug: true
         
     - name: Setup and start service
       uses: appleboy/ssh-action@v1.0.3
@@ -119,14 +122,26 @@ jobs:
         password: ${{ secrets.SERVER_PASSWORD }}
         port: ${{ secrets.SERVER_PORT }}
         script: |
+          # Debug: List files in /tmp to verify they were copied
+          echo "Files in /tmp:"
+          ls -la /tmp/
+          
           # Make binary executable
           chmod +x /opt/go-book-api/go-book-api
           
-          # Copy and enable systemd service
-          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S cp /tmp/go-book-api.service /etc/systemd/system/
-          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S systemctl daemon-reload
-          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S systemctl enable go-book-api
-          echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S systemctl start go-book-api
+          # Verify service file exists before copying
+          if [ -f /tmp/go-book-api.service ]; then
+            echo "Service file found, copying to systemd directory"
+            echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S cp /tmp/go-book-api.service /etc/systemd/system/
+            echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S systemctl daemon-reload
+            echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S systemctl enable go-book-api
+            echo "${{ secrets.SERVER_PASSWORD }}" | sudo -S systemctl start go-book-api
+          else
+            echo "ERROR: Service file not found at /tmp/go-book-api.service"
+            echo "Available files in /tmp:"
+            ls -la /tmp/
+            exit 1
+          fi
           
           # Wait a moment for service to start
           sleep 5
