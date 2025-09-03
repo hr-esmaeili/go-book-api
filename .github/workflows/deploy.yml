@@ -99,8 +99,7 @@ jobs:
         password: ${{ secrets.SERVER_PASSWORD }}
         port: ${{ secrets.SERVER_PORT }}
         source: "deploy/go-book-api.service"
-        target: "/tmp/"
-        strip_components: 0
+        target: "/tmp/go-book-api.service"
         debug: true
         
     - name: Copy environment file
