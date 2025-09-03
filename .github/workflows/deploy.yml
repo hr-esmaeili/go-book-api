@@ -64,22 +64,23 @@ jobs:
         username: ${{ secrets.SERVER_USER }}
         password: ${{ secrets.SERVER_PASSWORD }}
         port: ${{ secrets.SERVER_PORT }}
+        sudo: true
         script: |
           # Create application directory if it doesn't exist
-          sudo mkdir -p /opt/go-book-api
-          sudo chown $USER:$USER /opt/go-book-api
+          mkdir -p /opt/go-book-api
+          chown $USER:$USER /opt/go-book-api
           
           # Stop the service if it's running
-          sudo systemctl stop go-book-api || true
+          systemctl stop go-book-api || true
           
           # Backup current binary
           if [ -f /opt/go-book-api/go-book-api ]; then
-            sudo cp /opt/go-book-api/go-book-api /opt/go-book-api/go-book-api.backup.$(date +%Y%m%d_%H%M%S)
+            cp /opt/go-book-api/go-book-api /opt/go-book-api/go-book-api.backup.$(date +%Y%m%d_%H%M%S)
           fi
           
           # Create logs directory
-          sudo mkdir -p /var/log/go-book-api
-          sudo chown $USER:$USER /var/log/go-book-api
+          mkdir -p /var/log/go-book-api
+          chown $USER:$USER /var/log/go-book-api
           
     - name: Copy binary to server
       uses: appleboy/scp-action@v0.1.7
@@ -118,21 +119,22 @@ jobs:
         username: ${{ secrets.SERVER_USER }}
         password: ${{ secrets.SERVER_PASSWORD }}
         port: ${{ secrets.SERVER_PORT }}
+        sudo: true
         script: |
           # Make binary executable
           chmod +x /opt/go-book-api/go-book-api
           
           # Copy and enable systemd service
-          sudo cp /tmp/go-book-api.service /etc/systemd/system/
-          sudo systemctl daemon-reload
-          sudo systemctl enable go-book-api
-          sudo systemctl start go-book-api
+          cp /tmp/go-book-api.service /etc/systemd/system/
+          systemctl daemon-reload
+          systemctl enable go-book-api
+          systemctl start go-book-api
           
           # Wait a moment for service to start
           sleep 5
           
           # Check service status
-          sudo systemctl status go-book-api --no-pager
+          systemctl status go-book-api --no-pager
           
           # Test health endpoint
           curl -f http://localhost:8080/health || exit 1
