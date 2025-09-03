@@ -2,9 +2,20 @@ name: Deploy to Ubuntu Server
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ staging ]
   pull_request:
-    branches: [ main ]
+    branches: [ staging ]
+  workflow_dispatch:
+    inputs:
+      deployment_method:
+        description: 'Deployment method'
+        required: true
+        default: 'no-sudo'
+        type: choice
+        options:
+        - no-sudo
+        - docker
+        - simple
 
 jobs:
   test:
@@ -40,7 +51,7 @@ jobs:
   deploy:
     needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    if: github.ref == 'refs/heads/staging'
     
     steps:
     - uses: actions/checkout@v4
@@ -71,10 +82,11 @@ jobs:
         username: ${{ secrets.USERNAME }}
         password: ${{ secrets.PASSWORD }}
         port: ${{ secrets.PORT }}
-        source: "go-book-api.tar.gz,deploy.sh"
+        source: "go-book-api.tar.gz,deploy-no-sudo.sh,deploy-docker.sh,deploy-simple.sh"
         target: "/tmp/"
     
-    - name: Deploy to server
+    - name: Deploy to server (No-Sudo Method)
+      if: github.event.inputs.deployment_method == 'no-sudo' || (github.event.inputs.deployment_method == '' && github.ref == 'refs/heads/staging')
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.HOST }}
@@ -82,6 +94,98 @@ jobs:
         password: ${{ secrets.PASSWORD }}
         port: ${{ secrets.PORT }}
         script: |
-          # Make deploy script executable and run it
-          chmod +x /tmp/deploy.sh
-          sudo /tmp/deploy.sh
+          # Deploy using no-sudo method
+          chmod +x /tmp/deploy-no-sudo.sh
+          /tmp/deploy-no-sudo.sh
+          echo "✅ No-sudo deployment completed successfully!"
+    
+    - name: Deploy to server (Docker Method)
+      if: github.event.inputs.deployment_method == 'docker'
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        password: ${{ secrets.PASSWORD }}
+        port: ${{ secrets.PORT }}
+        script: |
+          # Check if Docker is installed
+          if ! command -v docker &> /dev/null; then
+            echo "❌ Docker is not installed on the server"
+            exit 1
+          fi
+          
+          # Deploy using Docker method
+          chmod +x /tmp/deploy-docker.sh
+          /tmp/deploy-docker.sh
+          echo "✅ Docker deployment completed successfully!"
+    
+    - name: Deploy to server (Simple Method)
+      if: github.event.inputs.deployment_method == 'simple'
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        password: ${{ secrets.PASSWORD }}
+        port: ${{ secrets.PORT }}
+        script: |
+          # Deploy using simple method
+          chmod +x /tmp/deploy-simple.sh
+          /tmp/deploy-simple.sh
+          echo "✅ Simple deployment completed successfully!"
+    
+    - name: Verify deployment
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        password: ${{ secrets.PASSWORD }}
+        port: ${{ secrets.PORT }}
+        script: |
+          # Wait a moment for service to start
+          sleep 10
+          
+          # Check if service is running based on deployment method
+          DEPLOYMENT_METHOD="${{ github.event.inputs.deployment_method }}"
+          if [ -z "$DEPLOYMENT_METHOD" ]; then
+            DEPLOYMENT_METHOD="no-sudo"
+          fi
+          
+          case $DEPLOYMENT_METHOD in
+            "no-sudo")
+              if systemctl --user is-active --quiet go-book-api; then
+                echo "✅ No-sudo service is running"
+                systemctl --user status go-book-api --no-pager
+              else
+                echo "❌ No-sudo service is not running"
+                systemctl --user status go-book-api --no-pager
+                exit 1
+              fi
+              ;;
+            "docker")
+              if docker ps | grep -q go-book-api; then
+                echo "✅ Docker container is running"
+                docker ps | grep go-book-api
+              else
+                echo "❌ Docker container is not running"
+                docker ps -a | grep go-book-api
+                exit 1
+              fi
+              ;;
+            "simple")
+              if [ -f ~/go-book-api/go-book-api.pid ] && ps -p $(cat ~/go-book-api/go-book-api.pid) > /dev/null 2>&1; then
+                echo "✅ Simple process is running (PID: $(cat ~/go-book-api/go-book-api.pid))"
+              else
+                echo "❌ Simple process is not running"
+                exit 1
+              fi
+              ;;
+          esac
+          
+          # Test API endpoint
+          echo "Testing API endpoint..."
+          if curl -f -s http://localhost:8080/health > /dev/null; then
+            echo "✅ API health check passed"
+          else
+            echo "❌ API health check failed"
+            exit 1
+          fi
